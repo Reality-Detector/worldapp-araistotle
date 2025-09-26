@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@worldcoin/minikit-js": "1.1.1",
+    "openid-client": "^5.3.3",
+    "express-session": "^1.17.3",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "node-fetch": "^3.3.2",
