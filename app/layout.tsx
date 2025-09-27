@@ -6,6 +6,27 @@ import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
 import { CreditProvider } from "@/components/CreditProvider";
 import FactCheckProvider from '@/components/FactCheckProvider/factcheck-context';
+import { DM_Mono, Rubik, Sora } from "next/font/google";
+import "@worldcoin/mini-apps-ui-kit-react/styles.css";
+
+const rubik = Rubik({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-sans",
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
+  variable: "--font-display",
+});
+
+const dmMono = DM_Mono({
+  weight: ["300", "400", "500"],
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,7 +47,7 @@ export default function RootLayout({
     }
   );
   return (
-    <html lang="en">
+    <html lang="en" className={`${rubik.className} ${sora.className} ${dmMono.className}`}>
       <body className={inter.className}>
         <NextAuthProvider>
           <CreditProvider>

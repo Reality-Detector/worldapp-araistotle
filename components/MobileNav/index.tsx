@@ -1,9 +1,20 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { Menu, X } from "iconoir-react";
 
-export const MobileNav = () => {
-  const [isOpen, setIsOpen] = useState(false);
+export const MobileNav = ({
+  isOpen: isOpenProp,
+  setIsOpen: setIsOpenProp,
+}: {
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
+}) => {
+  const [isOpenLocal, setIsOpenLocal] = useState(false);
+
+  const isControlled = typeof isOpenProp !== "undefined" && typeof setIsOpenProp === "function";
+  const isOpen = isControlled ? (isOpenProp as boolean) : isOpenLocal;
+  const setIsOpen = isControlled ? (setIsOpenProp as (open: boolean) => void) : setIsOpenLocal;
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -11,24 +22,26 @@ export const MobileNav = () => {
 
   return (
     <>
-      {/* Hamburger Menu Button */}
-      <button
-        onClick={toggleMenu}
-        className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg md:hidden"
-        aria-label="Toggle menu"
-      >
-        <div className="w-6 h-6 flex flex-col justify-center space-y-1">
-          <span className={`block h-0.5 w-6 bg-gray-600 transition-transform duration-300 ${isOpen ? 'rotate-45 translate-y-1.5' : ''}`}></span>
-          <span className={`block h-0.5 w-6 bg-gray-600 transition-opacity duration-300 ${isOpen ? 'opacity-0' : ''}`}></span>
-          <span className={`block h-0.5 w-6 bg-gray-600 transition-transform duration-300 ${isOpen ? '-rotate-45 -translate-y-1.5' : ''}`}></span>
-        </div>
-      </button>
+      {/* Hamburger Menu Button (render only when uncontrolled) */}
+      {!isControlled && (
+        <button
+          onClick={toggleMenu}
+          className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg md:hidden"
+          aria-label="Toggle menu"
+        >
+          {!isOpen ? (
+            <Menu width={24} height={24} strokeWidth={1.5} />
+          ) : (
+            <X width={24} height={24} strokeWidth={1.5} />
+          )}
+        </button>
+      )}
 
       {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={toggleMenu}
+          onClick={() => setIsOpen(false)}
         />
       )}
 
@@ -48,7 +61,7 @@ export const MobileNav = () => {
           <nav className="space-y-4">
             <Link
               href="/"
-              onClick={toggleMenu}
+                onClick={() => setIsOpen(false)}
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,7 +72,7 @@ export const MobileNav = () => {
             
             <Link
               href="/history"
-              onClick={toggleMenu}
+                onClick={() => setIsOpen(false)}
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

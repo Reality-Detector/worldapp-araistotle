@@ -1,0 +1,155 @@
+"use client";
+
+import { createChangeEvent } from "@/lib/utils";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+
+import { ClearButton } from "../ClearButton";
+import { Magnifier } from "../Icons/Magnifier";
+import { Input, InputProps } from "../Input";
+import { PasteButton } from "../PasteButton/PasteButton";
+import { Button } from "../Button";
+
+interface SearchFieldProps extends Omit<InputProps, "startAdornment" | "placeholder"> {
+  /**
+   * If true, the input will display in an error state with error styling
+   */
+  error?: boolean;
+  /**
+   * If true, the input will display in a valid state with success styling
+   */
+  isValid?: boolean;
+  /**
+   * If true, displays a paste button as an end adornment
+   * @default false
+   */
+  showPasteButton?: boolean;
+  /**
+   * Label for the paste button
+   * @default "Paste"
+   */
+  pasteButtonLabel?: string;
+  /**
+   * Label for the input
+   * @default "Search"
+   */
+  label?: string;
+  /**
+   * Optional callback invoked when the search button is clicked. Receives the current input value.
+   */
+  onSearch?: (value: string) => void;
+}
+
+const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
+  (
+    {
+      showPasteButton,
+      pasteButtonLabel,
+      isValid,
+      disabled,
+      type = "search",
+      autoComplete = "off",
+      spellCheck = "false",
+      endAdornment: endAdornmentProp,
+      label = "Search",
+      ...props
+    },
+    forwardedRef,
+  ) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [isFocused, setIsFocused] = useState(false);
+    const [isPasted, setIsPasted] = useState(false);
+    const [value, setValue] = useState("");
+    useImperativeHandle(forwardedRef, () => inputRef.current!);
+
+    let endAdornment = endAdornmentProp;
+    if (showPasteButton && !disabled) {
+      // If there's a value, show a search button (unless the field is focused, in which case show clear)
+      if (value) {
+        if (isFocused) {
+          endAdornment = (
+            <ClearButton
+              inputRef={inputRef}
+              onClear={() => {
+                if (inputRef.current) {
+                  const event = createChangeEvent(inputRef.current);
+                  props.onChange?.(event);
+                  setValue("");
+                }
+              }}
+            />
+          );
+        } else {
+          endAdornment = (
+            <Button
+              variant="tertiary"
+              size="icon"
+              type="button"
+              onClick={() => {
+                // prefer explicit onSearch prop if provided
+                (props as any).onSearch?.(value);
+              }}
+              aria-label="Search"
+            >
+              <Magnifier />
+            </Button>
+          );
+        }
+      } else if (!isPasted) {
+        endAdornment = (
+          <PasteButton
+            inputRef={inputRef}
+            label={pasteButtonLabel}
+            onPaste={() => {
+              if (inputRef.current) {
+                const event = createChangeEvent(inputRef.current);
+                props.onChange?.(event);
+                setIsPasted(true);
+                setValue(inputRef.current.value);
+              }
+            }}
+          />
+        );
+      }
+    }
+
+    return (
+      <Input
+        {...props}
+        ref={inputRef}
+        startAdornment={<Magnifier />}
+        isValid={isValid}
+        disabled={disabled}
+        endAdornment={endAdornment}
+        type={type}
+        autoComplete={autoComplete}
+        spellCheck={spellCheck}
+        onFocus={(e) => {
+          setIsFocused(true);
+          props.onFocus?.(e);
+        }}
+        label={label}
+        onBlur={(e) => {
+          setIsFocused(false);
+          props.onBlur?.(e);
+        }}
+        onChange={(e) => {
+          setValue(e.target.value);
+          props.onChange?.(e);
+        }}
+        onKeyDown={(e) => {
+          props.onKeyDown?.(e as any);
+          if (e.defaultPrevented) return;
+          if (e.key === "Enter" && value) {
+            (props as any).onSearch?.(value);
+          }
+        }}
+        className="rounded-full h-[3.125rem]"
+      />
+    );
+  },
+);
+
+SearchField.displayName = "SearchField";
+
+export { SearchField };
+export type { SearchFieldProps };
