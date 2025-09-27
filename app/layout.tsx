@@ -5,6 +5,7 @@ import MiniKitProvider from "@/components/minikit-provider";
 import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
 import { CreditProvider } from "@/components/CreditProvider";
+import FactCheckProvider from '@/components/FactCheckProvider/factcheck-context';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +32,9 @@ export default function RootLayout({
           <CreditProvider>
             <ErudaProvider>
               <MiniKitProvider>
-                {children}
+                <FactCheckProvider>
+                  {children}
+                </FactCheckProvider>
               </MiniKitProvider>
             </ErudaProvider>
           </CreditProvider>

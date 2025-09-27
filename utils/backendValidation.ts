@@ -17,16 +17,17 @@ const client = jwksClient({
   cacheMaxAge: 600000, // 10 minutes
   rateLimit: true,
   jwksRequestsPerMinute: 5,
-  jwksUri: 'https://id.worldcoin.org/.well-known/jwks.json'
+  // Note: do not duplicate keys — jwksUri already set above
 });
 
-function getKey(header: any, callback: any) {
-  client.getSigningKey(header.kid, (err, key) => {
+function getKey(header: any, callback: (err: Error | null, signingKey?: string | Buffer | undefined) => void) {
+  client.getSigningKey(header.kid, (err: Error | null, key: any) => {
     if (err) {
       callback(err);
       return;
     }
-    const signingKey = key?.getPublicKey();
+    // getPublicKey may return a string or Buffer depending on implementation
+    const signingKey = key?.getPublicKey ? key.getPublicKey() as string | Buffer : undefined;
     callback(null, signingKey);
   });
 }
@@ -57,7 +58,7 @@ export function validateWorldcoinToken(req: any, res: any, next: any) {
     audience: process.env.WLD_CLIENT_ID, // Your Worldcoin client ID
     issuer: 'https://id.worldcoin.org',
     algorithms: ['RS256']
-  }, (err: any, decoded: any) => {
+  }, (err: Error | null, decoded?: unknown) => {
     if (err) {
       console.error('Token validation error:', err);
       return res.status(401).json({ 
@@ -67,10 +68,11 @@ export function validateWorldcoinToken(req: any, res: any, next: any) {
     }
 
     // Add user info to request object
+    const d = decoded as any;
     req.user = {
-      id: decoded.sub,
-      verificationLevel: decoded['https://id.worldcoin.org/v1']?.verification_level,
-      ...decoded
+      id: d?.sub,
+      verificationLevel: d?.['https://id.worldcoin.org/v1']?.verification_level,
+      ...d
     };
     
     next();
@@ -105,14 +107,14 @@ export async function validateTokenInNextJS(request: Request) {
   const token = authHeader.substring(7);
 
   try {
-    const decoded = await new Promise((resolve, reject) => {
+    const decoded = await new Promise<unknown>((resolve, reject) => {
       jwt.verify(token, getKey, {
         audience: process.env.WLD_CLIENT_ID,
         issuer: 'https://id.worldcoin.org',
         algorithms: ['RS256']
-      }, (err, decoded) => {
+      }, (err: Error | null, decoded?: unknown) => {
         if (err) reject(err);
-        else resolve(decoded);
+        else resolve(decoded as unknown);
       });
     });
 

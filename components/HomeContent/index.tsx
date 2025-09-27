@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useAuth } from "../../hooks/useAuth";
 import { getUserWeb3Data } from "../../utils/apiClient";
 import { useCredits } from "../../components/CreditProvider";
+import { useFactCheck } from '@/components/FactCheckProvider/factcheck-context';
 
 export const HomeContent = () => {
   const [showMore, setShowMore] = useState(false);
@@ -13,6 +14,7 @@ export const HomeContent = () => {
   const [web3Error, setWeb3Error] = useState<string | null>(null);
   const { user, isAuthenticated, isLoading, accessToken, session } = useAuth();
   const { creditData, isLoading: creditsLoading, error: creditsError, refetchCredits } = useCredits();
+  const { results } = useFactCheck();
 
   // Fetch Web3 data when user is authenticated
   useEffect(() => {
@@ -52,7 +54,7 @@ export const HomeContent = () => {
     };
 
     fetchWeb3Data();
-  }, [isAuthenticated, accessToken, web3Loading, web3Data]);
+  }, [isAuthenticated, accessToken, web3Loading, web3Data, user?.name]);
 
   const handleLogUser = () => {
     console.log("=== DEBUG USER INFO ===");
@@ -104,8 +106,8 @@ export const HomeContent = () => {
 
   return (
     <div className="px-4 pb-32 max-w-4xl mx-auto">
-      {/* Banner */}
-      {showBanner && (
+      {/* If results exist, hide banner/panels and show results */}
+      {!results && showBanner && (
         <div className="bg-white border-2 border-blue-200 text-gray-800 p-5 rounded-xl mb-8 relative">
           <a 
             href="https://time.com/7094922/ai-seer-facticity-ai/" 
@@ -124,7 +126,7 @@ export const HomeContent = () => {
                 />
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-900 block">🏆 TIME's Best Inventions 2024</span>
+                <span className="text-sm font-medium text-gray-900 block">🏆 TIME&apos;s Best Inventions 2024</span>
                 <span className="text-xs text-gray-600">Recognized as one of 14 groundbreaking AIs</span>
               </div>
             </div>
@@ -144,89 +146,76 @@ export const HomeContent = () => {
         </div>
       )}
 
-      {/* About Facticity.AI Panel */}
-      <div className="bg-blue-50 rounded-xl p-6 mb-8 border-2 border-blue-200">
-        <div className="flex items-start space-x-3 mb-4">
-          <div className="bg-blue-100 p-2 rounded-lg border border-blue-300">
-            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      {!results && (
+        <div className="bg-blue-50 rounded-xl p-6 mb-8 border-2 border-blue-200">
+          <div className="flex items-start space-x-3 mb-4">
+            <div className="bg-blue-100 p-2 rounded-lg border border-blue-300">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-blue-800 mb-0">About Facticity.AI</h2>
           </div>
-          <h2 className="text-xl font-bold text-blue-800 mb-0">About Facticity.AI</h2>
-        </div>
-        
-        <div className="space-y-4">
-          <p className="text-gray-700 text-base leading-relaxed">
-            Our <span className="font-semibold text-blue-700">multi-modal and multi-lingual fact-checker</span> can verify text claims and video URLs from social media platforms. 
-            Try it out using the search bar below!
-          </p>
           
-          <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
-            <p className="text-gray-700 text-sm leading-relaxed mb-2">
-              <span className="font-medium text-blue-700">💰 Earn $FACY tokens</span> by helping us moderate the output of Facticity.AI
+          <div className="space-y-4">
+            <p className="text-gray-700 text-base leading-relaxed">
+              Our <span className="font-semibold text-blue-700">multi-modal and multi-lingual fact-checker</span> can verify text claims and video URLs from social media platforms. 
+              Try it out using the search bar below!
             </p>
-            <p className="text-gray-600 text-sm">
-              <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full mr-2 border border-blue-200">
-                🤖 AI Fact-Checked
-              </span>
-              <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full border border-green-200">
-                👥 Human Moderated
-              </span>
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowMore(!showMore)}
-          className="mt-4 text-blue-700 text-sm font-semibold flex items-center space-x-2 hover:text-blue-800 hover:bg-blue-100 px-3 py-2 rounded-lg transition-all duration-200 group border border-blue-200"
-        >
-          <span>{showMore ? 'Show less' : 'Learn more'}</span>
-          <svg 
-            className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${showMore ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        
-        {showMore && (
-          <div className="mt-4 p-4 bg-white rounded-lg border-2 border-blue-200">
-            <div className="space-y-3 text-gray-700 text-sm">
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p>Advanced AI technology that processes multiple content types including text, images, and videos</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p>Supports multiple languages for global fact-checking capabilities</p>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                <p>Community-driven moderation system with token rewards for contributors</p>
-              </div>
+            
+            <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
+              <p className="text-gray-700 text-sm leading-relaxed mb-2">
+                <span className="font-medium text-blue-700">💰 Earn $FACY tokens</span> by helping us moderate the output of Facticity.AI
+              </p>
+              <p className="text-gray-600 text-sm">
+                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full mr-2 border border-blue-200">
+                  🤖 AI Fact-Checked
+                </span>
+                <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                  👥 Human Moderated
+                </span>
+              </p>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Debug User Button */}
-      {/* <div className="bg-gray-50 rounded-xl p-6 mb-8 border-2 border-gray-200">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">Debug User Info</h3>
-        <button
-          onClick={handleLogUser}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
-        >
-          Log User Object to Console
-        </button>
-        <p className="text-sm text-gray-600 mt-2">
-          Click the button above to see user information in the browser console
-        </p>
-      </div> */}
+          <button
+            onClick={() => setShowMore(!showMore)}
+            className="mt-4 text-blue-700 text-sm font-semibold flex items-center space-x-2 hover:text-blue-800 hover:bg-blue-100 px-3 py-2 rounded-lg transition-all duration-200 group border border-blue-200"
+          >
+            <span>{showMore ? 'Show less' : 'Learn more'}</span>
+            <svg 
+              className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${showMore ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showMore && (
+            <div className="mt-4 p-4 bg-white rounded-lg border-2 border-blue-200">
+              <div className="space-y-3 text-gray-700 text-sm">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Advanced AI technology that processes multiple content types including text, images, and videos</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Supports multiple languages for global fact-checking capabilities</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>Community-driven moderation system with token rewards for contributors</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Credits Information Section */}
-      {isAuthenticated && (
+      {isAuthenticated && !results && (
         <div className="bg-purple-50 rounded-xl p-6 mb-8 border-2 border-purple-200">
           <h3 className="text-lg font-bold text-purple-800 mb-4">Your Credits</h3>
           
@@ -308,6 +297,137 @@ export const HomeContent = () => {
               </div>
             )}
           
+          </div>
+        </div>
+      )}
+
+      {/* If fact-check results exist, render them */}
+      {results && (
+        <div className="bg-white rounded-xl p-6 mb-8 border-2 border-gray-200">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Fact-check Results</h3>
+          <div className="space-y-4">
+            {results.map((r: any, idx: number) => {
+              // Try to extract the 'final' field from the result (as JSON string)
+              let finalObj: any = null;
+              let error = null;
+              if (r.result && typeof r.result === 'string') {
+                try {
+                  const lines = r.result.split(/\n+/).filter(Boolean);
+                  const finalLine = lines.reverse().find((line: string) => {
+                    try {
+                      const obj = JSON.parse(line);
+                      return obj.final;
+                    } catch { return false; }
+                  });
+                  if (finalLine) {
+                    const obj = JSON.parse(finalLine);
+                    finalObj = JSON.parse(obj.final);
+                  }
+                } catch (e) {
+                  error = e;
+                }
+              }
+              // Helper to render a field if present
+              const renderField = (label: string, value: any) => (
+                value ? (
+                  <div className="mb-2">
+                    <span className="font-semibold text-gray-700 mr-1">{label}:</span>
+                    {typeof value === 'string' ? <span className="text-gray-800">{value}</span> : <pre className="inline text-xs text-gray-700">{JSON.stringify(value, null, 2)}</pre>}
+                  </div>
+                ) : null
+              );
+              // Extract sources and source summaries from the finalObj if present
+              let sources: {title: string, url: string, summary?: string}[] = [];
+              if (finalObj && Array.isArray(finalObj.sources)) {
+                // If backend provides a sources array
+                sources = finalObj.sources.map((src: any) => ({
+                  title: src.title || src.source || src.url || 'Source',
+                  url: src.url || src.link || '',
+                  summary: src.summary || ''
+                }));
+              } else if (finalObj && typeof finalObj.overall_assessment === 'string') {
+                // Fallback: extract from summary markdown links
+                const linkRegex = /\[([^\]]+)\]\((https?:[^)]+)\)/g;
+                let match;
+                while ((match = linkRegex.exec(finalObj.overall_assessment)) !== null) {
+                  sources.push({ title: match[1], url: match[2] });
+                }
+              }
+              // Bias field: can be array or string
+              // let bias = finalObj && finalObj.bias; // commented out
+              // Disambiguation
+              let disambiguation = finalObj && finalObj.disambiguation;
+              // Timestamp
+              let timestamp = finalObj && finalObj.timestamp;
+              // VisualisationMode (user credits etc)
+              // let visualisationMode = finalObj && finalObj.visualisationMode; // commented out
+              // Task ID
+              // let taskId = finalObj && finalObj.task_id; // commented out
+              // Format timestamp
+              let formattedTimestamp = '';
+              if (timestamp) {
+                try {
+                  const d = new Date(timestamp);
+                  formattedTimestamp = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' });
+                } catch {}
+              }
+              // Highlight verdict
+              let verdict = finalObj && finalObj.Classification;
+              let verdictColor = verdict === 'False' ? 'bg-red-100 text-red-800 border border-red-300' : verdict === 'True' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-blue-100 text-blue-800 border border-blue-300';
+              // Bold **text** in summary
+              let summary = finalObj && finalObj.overall_assessment;
+              let summaryJsx = null;
+              if (typeof summary === 'string') {
+                // Replace **text** with <b>text</b>
+                const parts = summary.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+                summaryJsx = parts.map((part, i) => {
+                  if (/^\*\*[^*]+\*\*$/.test(part)) {
+                    return <b key={i}>{part.replace(/\*\*/g, '')}</b>;
+                  }
+                  return <span key={i}>{part}</span>;
+                });
+              }
+              return (
+                <div key={idx} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <div className="text-sm text-gray-700 font-medium">Claim:</div>
+                  <div className="text-base text-gray-900 mb-2">{r.claim}</div>
+                  {finalObj && (
+                    <>
+                      {verdict && (
+                        <div className={`mb-2 inline-block px-2 py-1 rounded text-xs font-semibold mr-2 ${verdictColor}`}>Verdict: {verdict}</div>
+                      )}
+                      {summaryJsx && (
+                        <div className="mb-2 text-gray-800 text-sm whitespace-pre-line">{summaryJsx}</div>
+                      )}
+                      {renderField('Disambiguation', disambiguation)}
+                      {formattedTimestamp && renderField('Timestamp', formattedTimestamp)}
+                      {/* {renderField('Bias', bias)} */}
+                      {/* {renderField('Task ID', taskId)} */}
+                      {/* {renderField('User Info', visualisationMode)} */}
+                      {sources && sources.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-xs font-semibold text-gray-700 mb-1">Sources & Summaries:</div>
+                          <ul className="list-disc list-inside text-xs text-blue-700">
+                            {sources.map((src, i) => (
+                              <li key={i} className="mb-1">
+                                <a href={src.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-900 font-semibold">{src.title}</a>
+                                {src.summary && <span className="ml-2 text-gray-700">- {src.summary}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!finalObj && (
+                    <div className="text-xs text-gray-600">{JSON.stringify(r.result || r.error || r, null, 2)}</div>
+                  )}
+                  {error && (
+                    <div className="text-xs text-red-600 mt-2">Error parsing result: {String(error)}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

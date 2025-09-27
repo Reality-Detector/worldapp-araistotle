@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from '@/hooks/useAuth';
 
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   data?: T | null;
   error?: string | null;
   status: number;
@@ -42,7 +42,8 @@ export function useApiClient() {
       };
     }
     try {
-      const url = `${baseUrl}${endpoint}`;
+        const url = `${baseUrl}${endpoint}`;
+        console.debug('[apiClient] POST ->', url, { payload, endpoint });
       
       const response = await fetch(url, {
         method: 'POST',
@@ -55,7 +56,10 @@ export function useApiClient() {
         body: JSON.stringify(payload)
       });
 
-      const responseData = await response.json();
+        const text = await response.text();
+        let responseData: any = null;
+        try { responseData = JSON.parse(text); } catch { responseData = text; }
+        console.debug('[apiClient] POST <-', url, { status: response.status, body: responseData });
 
       if (!response.ok) {
         return {
@@ -220,6 +224,7 @@ export async function sendAuthenticatedGet<T = any>(
   });
   
   try {
+    console.debug('[apiClient] GET ->', url.toString());
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
@@ -230,7 +235,10 @@ export async function sendAuthenticatedGet<T = any>(
       }
     });
 
-    const responseData = await response.json();
+    const text = await response.text();
+    let responseData: any = null;
+    try { responseData = JSON.parse(text); } catch { responseData = text; }
+    console.debug('[apiClient] GET <-', url.toString(), { status: response.status, body: responseData });
 
     if (!response.ok) {
       return {
@@ -255,6 +263,59 @@ export async function sendAuthenticatedGet<T = any>(
       success: false
     };
   }
+}
+
+/**
+ * Backwards-compatible top-level helpers.
+ * Other modules in the repo import `postToBackend` / `getFromBackend` directly.
+ * These functions accept an optional accessToken. If provided they delegate to
+ * the token-based helpers; otherwise they return a 401-like ApiResponse.
+ */
+export async function postToBackend<T = any>({
+  payload,
+  endpoint,
+  accessToken,
+  baseUrl
+}: {
+  payload: any;
+  endpoint: string;
+  accessToken?: string;
+  baseUrl?: string;
+}): Promise<ApiResponse<T>> {
+  if (!accessToken) {
+    return {
+      data: null,
+      error: 'No access token provided.',
+      status: 401,
+      success: false
+    };
+  }
+
+  // reuse existing helper
+  return sendAuthenticatedPost<T>(payload, endpoint, accessToken);
+}
+
+export async function getFromBackend<T = any>({
+  endpoint,
+  queryParams = {},
+  accessToken,
+  baseUrl
+}: {
+  endpoint: string;
+  queryParams?: Record<string, string>;
+  accessToken?: string;
+  baseUrl?: string;
+}): Promise<ApiResponse<T>> {
+  if (!accessToken) {
+    return {
+      data: null,
+      error: 'No access token provided.',
+      status: 401,
+      success: false
+    };
+  }
+
+  return sendAuthenticatedGet<T>(endpoint, queryParams, accessToken);
 }
 
 /**
@@ -303,6 +364,98 @@ export async function checkCreditsUtil(
     '/check_credits_util',
     accessToken
   );
+}
+
+/**
+ * Convenience hook-level helpers (use inside React components via useApiClient)
+ * - extractClaim: calls POST /extract-claim with the provided payload
+ * - factCheckSync: calls POST /fact-check-sync with the provided body
+ */
+export async function extractClaimWithToken<T = any>(
+  payload: any,
+  accessToken: string
+): Promise<ApiResponse<T>> {
+  return sendAuthenticatedPost<T>(payload, '/extract-claim', accessToken);
+}
+
+export async function factCheckSyncWithToken<T = any>(
+  body: any,
+  accessToken: string
+): Promise<ApiResponse<T>> {
+  return sendAuthenticatedPost<T>(body, '/fact-check-sync', accessToken);
+}
+
+/**
+ * Hook-friendly wrappers that use the in-hook postToBackend (which automatically
+ * reads the auth token via useAuth). Prefer these inside React components.
+ */
+export function useFactCheckClient() {
+  const { postToBackend, getFromBackend } = useApiClient();
+  const { accessToken } = useAuth();
+
+  const defaultBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://r8wncu74i2.us-west-2.awsapprunner.com';
+
+  // internal helper that will use the hook postToBackend when we have an access token,
+  // otherwise it will perform a direct unauthenticated fetch (machine-mode)
+  const doPost = async <T = any>(endpoint: string, body: any, baseUrl?: string): Promise<ApiResponse<T>> => {
+    const base = baseUrl || defaultBase;
+    if (accessToken) {
+      return postToBackend<T>({ payload: body, endpoint, baseUrl: base });
+    }
+
+    try {
+      const url = `${base}${endpoint}`;
+      console.debug('[apiClient] unauth POST ->', url, { body });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Validator': 'worldapp',
+          'Frontend': 'worldapp'
+        },
+        body: JSON.stringify(body)
+      });
+
+      const text = await response.text();
+      let responseData: any = null;
+      try { responseData = JSON.parse(text); } catch { responseData = text; }
+      console.debug('[apiClient] unauth POST <-', url, { status: response.status, body: responseData });
+
+      if (!response.ok) {
+        return {
+          data: null,
+          error: responseData?.message || `HTTP error! status: ${response.status}`,
+          status: response.status,
+          success: false
+        };
+      }
+
+      return {
+        data: responseData,
+        error: null,
+        status: response.status,
+        success: true
+      };
+    } catch (error) {
+      console.error('[apiClient] unauth POST error', error);
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : 'An unknown error occurred',
+        status: 0,
+        success: false
+      };
+    }
+  };
+
+  const extractClaim = async <T = any>(payload: any, baseUrl?: string) => {
+    return doPost<T>('/extract-claim', payload, baseUrl);
+  };
+
+  const factCheckSync = async <T = any>(body: any, baseUrl?: string) => {
+    return doPost<T>('/fact-check-sync', body, baseUrl);
+  };
+
+  return { extractClaim, factCheckSync, getFromBackend };
 }
 
 // Example usage:

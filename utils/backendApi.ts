@@ -1,5 +1,5 @@
 "use client";
-import { postToBackend } from './apiClient';
+import { postToBackend, ApiResponse } from './apiClient';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
@@ -12,21 +12,17 @@ export function useBackendApi() {
   const sendPost = async <T = any>(
     payload: any,
     endpoint: string
-  ): Promise<{ data?: T; error?: string; status: number; success: boolean }> => {
+  ): Promise<ApiResponse<T>> => {
     if (!accessToken) {
       return {
-        data: null,
+        data: undefined,
         error: 'No access token available. Please sign in.',
         status: 401,
         success: false
       };
     }
 
-    return postToBackend<T>({
-      payload,
-      accessToken,
-      endpoint
-    });
+    return postToBackend<T>({ payload, accessToken, endpoint });
   };
 
   return { sendPost };
