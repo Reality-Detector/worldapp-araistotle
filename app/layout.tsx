@@ -4,6 +4,7 @@ import "./globals.css";
 import MiniKitProvider from "@/components/minikit-provider";
 import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
+import { CreditProvider } from "@/components/CreditProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,11 +28,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <NextAuthProvider>
-          <ErudaProvider>
-            <MiniKitProvider>
-              {children}
-            </MiniKitProvider>
-          </ErudaProvider>
+          <CreditProvider>
+            <ErudaProvider>
+              <MiniKitProvider>
+                {children}
+              </MiniKitProvider>
+            </ErudaProvider>
+          </CreditProvider>
         </NextAuthProvider>
       </body>
     </html>

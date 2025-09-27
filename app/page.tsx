@@ -1,14 +1,24 @@
-import { PayBlock } from "@/components/Pay";
-import { SignIn } from "@/components/SignIn";
-import { VerifyBlock } from "@/components/Verify";
+import { MobileNav } from "@/components/MobileNav";
+import { MobileHeader } from "@/components/MobileHeader";
+import { BottomSearchBar } from "@/components/BottomSearchBar";
+import { HomeContent } from "@/components/HomeContent";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 gap-y-3">
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Navigation */}
+      <MobileNav />
       
-      <SignIn />
-      <VerifyBlock />
-      <PayBlock />
-    </main>
+      {/* Mobile Header */}
+      <MobileHeader />
+      
+      {/* Main Content */}
+      <main className="pt-16">
+        <HomeContent />
+      </main>
+      
+      {/* Bottom Search Bar */}
+      <BottomSearchBar />
+    </div>
   );
 }
