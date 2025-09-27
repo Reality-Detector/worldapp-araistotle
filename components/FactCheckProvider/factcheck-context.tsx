@@ -1,7 +1,16 @@
 "use client";
 import React, { createContext, useContext, useState } from "react";
 
-export type FactCheckResult = any;
+export interface FactCheckResult {
+  id: string;
+  claim: string;
+  result?: any;
+  error?: string;
+  status?: number;
+  timestamp: string;
+  sessionId: string;
+  taskId?: string;
+}
 
 interface FactCheckContextShape {
   results: FactCheckResult[] | null;

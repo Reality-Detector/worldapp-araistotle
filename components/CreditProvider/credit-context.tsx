@@ -8,6 +8,7 @@ interface CreditContextType {
   isLoading: boolean;
   error: string | null;
   refetchCredits: () => Promise<void>;
+  deductCredits: (amount: number) => void;
 }
 
 const CreditContext = createContext<CreditContextType | undefined>(undefined);
@@ -62,6 +63,17 @@ export const CreditProvider: React.FC<CreditProviderProps> = ({ children }) => {
     await fetchCredits();
   };
 
+  const deductCredits = (amount: number) => {
+    setCreditData(prev => {
+      if (!prev) return prev;
+      
+      return {
+        ...prev,
+        daily_credits: Math.max(0, prev.daily_credits - amount)
+      };
+    });
+  };
+
   // Fetch credits when user is authenticated
   useEffect(() => {
     if (isAuthenticated && accessToken && user?.name && !creditData && !isLoading) {
@@ -74,6 +86,7 @@ export const CreditProvider: React.FC<CreditProviderProps> = ({ children }) => {
     isLoading,
     error,
     refetchCredits,
+    deductCredits,
   };
 
   return (

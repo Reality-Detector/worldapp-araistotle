@@ -385,6 +385,18 @@ export async function factCheckSyncWithToken<T = any>(
   return sendAuthenticatedPost<T>(body, '/fact-check-sync', accessToken);
 }
 
+export async function addTaskIdWithToken<T = any>(
+  sessionId: string,
+  taskId: string,
+  accessToken: string
+): Promise<ApiResponse<T>> {
+  return sendAuthenticatedPost<T>(
+    { link: "", mode: "verify",_id: sessionId, task_id: taskId },
+    '/add_task_id',
+    accessToken
+  );
+}
+
 /**
  * Hook-friendly wrappers that use the in-hook postToBackend (which automatically
  * reads the auth token via useAuth). Prefer these inside React components.
@@ -455,7 +467,11 @@ export function useFactCheckClient() {
     return doPost<T>('/fact-check-sync', body, baseUrl);
   };
 
-  return { extractClaim, factCheckSync, getFromBackend };
+  const addTaskId = async <T = any>(sessionId: string, taskId: string, baseUrl?: string) => {
+    return doPost<T>('/add_task_id', { _id: sessionId, task_id: taskId, link: "", mode: "verify" }, baseUrl);
+  };
+
+  return { extractClaim, factCheckSync, addTaskId, getFromBackend };
 }
 
 // Example usage:
