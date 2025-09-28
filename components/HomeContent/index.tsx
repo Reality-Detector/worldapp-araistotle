@@ -6,6 +6,7 @@ import { getUserWeb3Data } from "../../utils/apiClient";
 import { useCredits } from "../../components/CreditProvider";
 import { useFactCheck } from '@/components/FactCheckProvider/factcheck-context';
 import FactCheckFeedback from '../FactCheckFeedback';
+import ClaimsVisualization from '../ClaimsVisualization';
 
 export const HomeContent = () => {
   const [showMore, setShowMore] = useState(false);
@@ -17,7 +18,7 @@ export const HomeContent = () => {
   const [expandedDisambiguations, setExpandedDisambiguations] = useState<Set<string>>(new Set());
   const { user, isAuthenticated, isLoading, accessToken, session } = useAuth();
   const { creditData, isLoading: creditsLoading, error: creditsError, refetchCredits } = useCredits();
-  const { results } = useFactCheck();
+  const { results, claims } = useFactCheck();
 
   // Helper functions for managing expanded results
   const toggleResult = (idx: number) => {
@@ -334,6 +335,13 @@ export const HomeContent = () => {
           
           </div>
         </div>
+      )}
+
+      {/* If claims exist, show claims visualization */}
+      {claims && (
+        <ClaimsVisualization 
+          claims={claims}
+        />
       )}
 
       {/* If fact-check results exist, render them */}

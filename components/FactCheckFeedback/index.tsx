@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCredits } from '../../components/CreditProvider';
+import { useRewardPoints } from '../../utils/apiClient';
 
 const FACT_CHECK_FEEDBACK_COLOR = '#0066FF'; // Define the custom blue color
 
@@ -49,10 +50,10 @@ const FactCheckFeedback = ({
   const [creditAmount, setCreditAmount] = useState(3);
   const [rewardMessage, setRewardMessage] = useState('');
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
   
-  const { user, isAuthenticated } = useAuth();
-  const { creditData } = useCredits();
+  const { user, isAuthenticated, session } = useAuth();
+  const { creditData, refetchCredits } = useCredits();
+  const { rewardBonusPoint } = useRewardPoints();
   
   // Check if user is logged in
   const isLoggedIn = Boolean(userEmail || user?.email || user?.name);
@@ -63,34 +64,52 @@ const FactCheckFeedback = ({
     userEmail,
     userEmailFromUser: user?.email,
     userNameFromUser: user?.name,
+    fullUserObject: user,
     isLoggedIn,
-    isAuthenticated
+    isAuthenticated,
+    session: session
   });
   
   // Centralized function to handle POST requests
   const postFactCheckAction = async (actionType: string, data: any = {}) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/fact-checks/${factCheckId}/${actionType}`, {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Validator': 'worldapp',
+        'Frontend': 'worldapp',
+        'Authorization': `Bearer ${accessToken}`
+      };
+      
+      
+      const requestBody = {
+        ...data,
+        userEmail: userEmail || user?.email || user?.name
+      };
+      
+      console.log('Making API request:', {
+        url: `${backendUrl}/api/tasks/${factCheckId}/${actionType}`,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          userEmail: userEmail || user?.email,
-          factCheckId,
-          claim,
-          verdict
-        }),
+        body: requestBody
       });
+
+      const response = await fetch(`${backendUrl}/api/tasks/${factCheckId}/${actionType}`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('API response status:', response.status);
+      console.log('API response ok:', response.ok);
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('API error response:', errorData);
         throw new Error(errorData.error || 'Something went wrong');
       }
 
       const result = await response.json();
+      console.log('API success response:', result);
       return result;
     } catch (error) {
       console.error(`Failed to ${actionType}:`, error);
@@ -109,7 +128,6 @@ const FactCheckFeedback = ({
     setDisliked(false);
     setFeedbackType('like');
     setFeedbackDialogOpen(true);
-    setShowMenu(false);
     
     console.log('Calling postFactCheckAction with like');
     await postFactCheckAction('like');
@@ -122,7 +140,6 @@ const FactCheckFeedback = ({
     setLiked(false);
     setFeedbackType('dislike');
     setFeedbackDialogOpen(true);
-    setShowMenu(false);
     
     await postFactCheckAction('dislike');
   };
@@ -141,27 +158,73 @@ const FactCheckFeedback = ({
     const feedbackData = {
       reasons: feedbackReason,
       comments: feedbackText,
-      type: feedbackType
     };
 
     const result = await postFactCheckAction('feedback', feedbackData);
-    if (result && result.success) {
+    if (result) {
       setFeedbackDialogOpen(false);
       
-      // Get credits from the API response
-      const creditsAwarded = result.data?.creditsAwarded || 3;
+      // Calculate credits: 3 for basic feedback, 6 for written feedback
+      const hasTextFeedback = feedbackText && feedbackText.trim().length > 0;
+      const creditsAwarded = hasTextFeedback ? 6 : 3;
       
-      // Award points
-      setCreditAmount(creditsAwarded);
-      setRewardMessage('Thank you for your feedback!');
-      setShowCreditAnimation(true);
-      
-      // Hide the animation after 2.5 seconds
-      setTimeout(() => {
-        setShowCreditAnimation(false);
+      // Call reward points API after successful feedback
+      if (user?.name) {
+        try {
+          const rewardResult = await rewardBonusPoint(
+            'feedback',
+            creditsAwarded,
+            factCheckId, // Use factCheckId as task_id
+            user.name, // This is the worldId from auth
+            backendUrl
+          );
+          
+          if (rewardResult.success && rewardResult.data) {
+            console.log(`Successfully rewarded ${creditsAwarded} points for feedback`, rewardResult.data);
+            
+            // Show credit animation only after successful backend response
+            console.log('Reward result:', rewardResult);
+            setCreditAmount(creditsAwarded);
+            setRewardMessage(rewardResult.data.message || 'Thank you for your feedback!');
+            setShowCreditAnimation(true);
+            
+            // Refetch credits to update the credit state
+            await refetchCredits();
+            
+            console.log('Updated credits:', {
+              updatedCredits: rewardResult.data.updatedCredits,
+              dailyCredits: rewardResult.data.dailyCredits,
+              lifetimeCredits: rewardResult.data.lifetimeCredits,
+              communityCredits: rewardResult.data.communityCredits
+            });
+            
+            // Hide the animation after 2.5 seconds
+            setTimeout(() => {
+              setShowCreditAnimation(false);
+              setFeedbackText('');
+              setFeedbackReason([]);
+            }, 2500);
+          } else {
+            console.error("Failed to reward points:", rewardResult.error || "Unknown error");
+            // Still show success message even if reward points failed
+            setSnackbar({ open: true, message: 'Feedback submitted successfully', severity: 'success' });
+            setFeedbackText('');
+            setFeedbackReason([]);
+          }
+        } catch (error) {
+          console.error("Error rewarding points:", error);
+          // Still show success message even if reward points failed
+          setSnackbar({ open: true, message: 'Feedback submitted successfully', severity: 'success' });
+          setFeedbackText('');
+          setFeedbackReason([]);
+        }
+      } else {
+        console.log("Cannot reward points: missing user.name (worldId)");
+        // Show success message even if we can't reward points
+        setSnackbar({ open: true, message: 'Feedback submitted successfully', severity: 'success' });
         setFeedbackText('');
         setFeedbackReason([]);
-      }, 2500);
+      }
     }
   };
 
@@ -190,20 +253,8 @@ const FactCheckFeedback = ({
     }
   }, [snackbar.open]);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showMenu) {
-        setShowMenu(false);
-      }
-    };
-
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showMenu]);
-
+  console.log('FactCheckFeedback rendering with:', { isLoggedIn, liked, disliked });
+  
   return (
     <div className="relative transition-all duration-300">
       {/* Credit Animation */}
@@ -248,73 +299,57 @@ const FactCheckFeedback = ({
       <div className="flex flex-col gap-1 w-full">
         {/* Action buttons group */}
         <div className="flex gap-2 justify-end flex-shrink-0">
-          {/* Rate Button */}
-          <div className="relative">
+          {/* Like Button */}
+          <div className="flex flex-col items-center">
             <button
-              onClick={() => {
-                console.log('Main button clicked', { showMenu, isLoggedIn, loading });
-                setShowMenu(!showMenu);
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Like button clicked');
+                handleLike();
               }}
               disabled={loading || !isLoggedIn}
               className={`p-2 rounded-lg transition-all duration-200 ${
                 liked 
                   ? 'text-blue-600 bg-blue-100' 
-                  : disliked 
-                    ? 'text-red-600 bg-red-100' 
-                    : isLoggedIn 
-                      ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-800' 
-                      : 'text-gray-400 cursor-not-allowed'
+                  : isLoggedIn 
+                    ? 'text-gray-600 hover:bg-blue-50 hover:text-blue-600 cursor-pointer' 
+                    : 'text-gray-400 cursor-not-allowed'
               } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {liked ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.894a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                </svg>
-              ) : disliked ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.894a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              )}
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.894a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+              </svg>
             </button>
-            
-            {/* Menu */}
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      console.log('Like button in menu clicked');
-                      handleLike();
-                    }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                  >
-                    <svg className="w-4 h-4 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.894a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                    </svg>
-                    Like
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('Dislike button in menu clicked');
-                      handleDislike();
-                    }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <svg className="w-4 h-4 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.894a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                    </svg>
-                    Dislike
-                  </button>
-                </div>
-              </div>
-            )}
-            
             <div className="text-xs font-bold text-center mt-1 text-blue-600 whitespace-nowrap">
-              Rate (+6)
+              Like
+            </div>
+          </div>
+
+          {/* Dislike Button */}
+          <div className="flex flex-col items-center">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Dislike button clicked');
+                handleDislike();
+              }}
+              disabled={loading || !isLoggedIn}
+              className={`p-2 rounded-lg transition-all duration-200 ${
+                disliked 
+                  ? 'text-red-600 bg-red-100' 
+                  : isLoggedIn 
+                    ? 'text-gray-600 hover:bg-red-50 hover:text-red-600 cursor-pointer' 
+                    : 'text-gray-400 cursor-not-allowed'
+              } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.894a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+              </svg>
+            </button>
+            <div className="text-xs font-bold text-center mt-1 text-red-600 whitespace-nowrap">
+              Dislike
             </div>
           </div>
         </div>

@@ -12,18 +12,48 @@ export interface FactCheckResult {
   taskId?: string;
 }
 
+export interface ClaimStatus {
+  id: string;
+  claim: string;
+  status: 'pending' | 'fact-checking' | 'completed' | 'error';
+  taskId?: string;
+  error?: string;
+  timestamp: string;
+}
+
 interface FactCheckContextShape {
   results: FactCheckResult[] | null;
   setResults: (r: FactCheckResult[] | null) => void;
+  claims: ClaimStatus[] | null;
+  setClaims: (c: ClaimStatus[] | null) => void;
+  updateClaimStatus: (claimId: string, status: ClaimStatus['status'], error?: string) => void;
 }
 
 const FactCheckContext = createContext<FactCheckContextShape | undefined>(undefined);
 
 export const FactCheckProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [results, setResults] = useState<FactCheckResult[] | null>(null);
+  const [claims, setClaims] = useState<ClaimStatus[] | null>(null);
+
+  const updateClaimStatus = (claimId: string, status: ClaimStatus['status'], error?: string) => {
+    setClaims(prevClaims => {
+      if (!prevClaims) return null;
+      return prevClaims.map(claim => 
+        claim.id === claimId 
+          ? { ...claim, status, error }
+          : claim
+      );
+    });
+  };
 
   return (
-    <FactCheckContext.Provider value={{ results, setResults }}>
+    <FactCheckContext.Provider value={{ 
+      results, 
+      setResults, 
+      claims, 
+      setClaims, 
+      updateClaimStatus 
+    }}>
       {children}
     </FactCheckContext.Provider>
   );

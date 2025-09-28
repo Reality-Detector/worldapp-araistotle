@@ -9,6 +9,14 @@ export async function POST(
     const body = await request.json();
     const { userEmail, claim, verdict } = body;
 
+    console.log('API Dislike endpoint called:', {
+      factCheckId,
+      body,
+      userEmail,
+      claim,
+      verdict
+    });
+
     if (!factCheckId) {
       return NextResponse.json(
         { success: false, error: 'Fact check ID is required' },
@@ -38,6 +46,10 @@ export async function POST(
       timestamp: new Date().toISOString()
     });
 
+    // Award credits for disliking (constructive feedback)
+    const creditsAwarded = 1;
+    const rewardMessage = 'Thanks for your feedback!';
+
     return NextResponse.json({
       success: true,
       message: 'Fact check disliked successfully',
@@ -45,6 +57,8 @@ export async function POST(
         factCheckId,
         userEmail,
         disliked: true,
+        creditsAwarded: creditsAwarded,
+        rewardMessage: rewardMessage,
         timestamp: new Date().toISOString()
       }
     });

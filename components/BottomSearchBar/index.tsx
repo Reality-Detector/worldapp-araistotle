@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useFactCheckClient } from '@/utils/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { useFactCheck, FactCheckResult } from '@/components/FactCheckProvider/factcheck-context';
+import { useFactCheck, FactCheckResult, ClaimStatus } from '@/components/FactCheckProvider/factcheck-context';
 import { useCredits } from '@/components/CreditProvider';
 
 interface ProgressState {
@@ -31,7 +31,7 @@ export const BottomSearchBar = () => {
 
   const { extractClaim, factCheckSync, addTaskId } = useFactCheckClient();
   const { accessToken, user } = useAuth();
-  const { setResults } = useFactCheck();
+  const { setResults, setClaims, updateClaimStatus } = useFactCheck();
   const { deductCredits } = useCredits();
 
   // Input validation
@@ -96,7 +96,8 @@ export const BottomSearchBar = () => {
       message: ''
     });
     setResults(null);
-  }, [setResults]);
+    setClaims(null);
+  }, [setResults, setClaims]);
 
   // Cancel current operation
   const cancelOperation = useCallback(() => {
@@ -189,8 +190,8 @@ export const BottomSearchBar = () => {
         throw new Error(extractRes.error || 'Failed to extract claims');
       }
 
-      const claims = extractRes.data?.claims || [];
-      if (!claims.length) {
+      const extractedClaims = extractRes.data?.claims || [];
+      if (!extractedClaims.length) {
         setProgress({
           currentStep: 'completed',
           currentClaimIndex: 0,
@@ -201,11 +202,22 @@ export const BottomSearchBar = () => {
         return;
       }
 
+      // Create claim status objects for visualization
+      const claimStatuses: ClaimStatus[] = extractedClaims.map((claim: any, index: number) => ({
+        id: generateClaimId(sessionId, index),
+        claim: typeof claim === 'string' ? claim : claim?.text || claim?.claim || '',
+        status: 'pending' as const,
+        timestamp: new Date().toISOString()
+      }));
+
+      // Set claims for visualization
+      setClaims(claimStatuses);
+
       setProgress(prev => ({
         ...prev,
         currentStep: 'fact-checking',
-        totalClaims: claims.length,
-        message: `Found ${claims.length} claim${claims.length > 1 ? 's' : ''} — starting fact-checking...`
+        totalClaims: extractedClaims.length,
+        message: `Found ${extractedClaims.length} claim${extractedClaims.length > 1 ? 's' : ''} — starting fact-checking...`
       }));
 
       // Process claims with better progress tracking and parallel processing for better performance
@@ -213,19 +225,22 @@ export const BottomSearchBar = () => {
       
       // Process claims in batches for better performance
       const batchSize = 3; // Process up to 3 claims in parallel
-      for (let i = 0; i < claims.length; i += batchSize) {
+      for (let i = 0; i < extractedClaims.length; i += batchSize) {
         // Check if operation was cancelled
         if (abortControllerRef.current?.signal.aborted) {
           throw new Error('Operation cancelled');
         }
 
-        const batch = claims.slice(i, i + batchSize);
+        const batch = extractedClaims.slice(i, i + batchSize);
         
         // Process batch in parallel
         const batchPromises = batch.map(async (claim: any, batchIndex: number) => {
           const claimIndex = i + batchIndex;
           const claimText = typeof claim === 'string' ? claim : claim?.text || claim?.claim || '';
           const claimId = generateClaimId(sessionId, claimIndex);
+
+          // Update claim status to fact-checking
+          updateClaimStatus(claimId, 'fact-checking');
 
           const body = {
             deployment_mode: 'frontend2',
@@ -266,6 +281,13 @@ export const BottomSearchBar = () => {
               }
             }
             
+            // Update claim status based on result
+            if (fcRes.success) {
+              updateClaimStatus(claimId, 'completed');
+            } else {
+              updateClaimStatus(claimId, 'error', fcRes.error || 'Unknown error');
+            }
+
             return {
               id: claimId,
               claim: claimText,
@@ -278,6 +300,9 @@ export const BottomSearchBar = () => {
               taskId
             };
           } catch (claimError) {
+            // Update claim status to error
+            updateClaimStatus(claimId, 'error', claimError instanceof Error ? claimError.message : 'Unknown error');
+
             return {
               id: claimId,
               claim: claimText,
@@ -324,9 +349,9 @@ export const BottomSearchBar = () => {
         // Update progress
         setProgress(prev => ({
           ...prev,
-          currentClaimIndex: Math.min(i + batchSize, claims.length),
-          completedClaims: Math.min(i + batchSize, claims.length),
-          message: `Fact-checking claim ${Math.min(i + batchSize, claims.length)} of ${claims.length}...`
+          currentClaimIndex: Math.min(i + batchSize, extractedClaims.length),
+          completedClaims: Math.min(i + batchSize, extractedClaims.length),
+          message: `Fact-checking claim ${Math.min(i + batchSize, extractedClaims.length)} of ${extractedClaims.length}...`
         }));
 
         // Update results in real-time
@@ -413,13 +438,6 @@ export const BottomSearchBar = () => {
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-200 shadow-lg z-20">
       <div className="p-4 pb-6">
         <form onSubmit={handleSearch} className="flex items-center space-x-3">
-          {/* Search Icon */}
-          <div className="flex-shrink-0">
-            <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          
           {/* Search Input */}
           <input
             ref={inputRef}
@@ -516,7 +534,7 @@ export const BottomSearchBar = () => {
             )}
 
             {/* Success Message */}
-            {progress.currentStep === 'completed' && (
+            {/* {progress.currentStep === 'completed' && (
               <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -532,7 +550,7 @@ export const BottomSearchBar = () => {
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         )}
 

@@ -398,6 +398,114 @@ export async function addTaskIdWithToken<T = any>(
 }
 
 /**
+ * Interface for reward points response
+ */
+export interface RewardPointsResponse {
+  success: boolean;
+  message: string;
+  updatedCredits?: number;
+  dailyCredits?: number;
+  lifetimeCredits?: number;
+  communityCredits?: number;
+}
+
+/**
+ * Hook to reward bonus points to a user
+ * Uses useAuth to get access token automatically
+ * @returns Object with rewardBonusPoint function
+ */
+export function useRewardPoints() {
+  const { accessToken } = useAuth();
+
+  const rewardBonusPoint = async (
+    type: string,
+    points: number,
+    taskId: string,
+    worldId: string,
+    backendUrl?: string
+  ): Promise<ApiResponse<RewardPointsResponse>> => {
+    const baseUrl = backendUrl || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://r8wncu74i2.us-west-2.awsapprunner.com';
+    
+    // Don't proceed if no worldId or task ID
+    if (!worldId || !taskId) {
+      console.log("Cannot reward points: missing worldId or task ID");
+      return {
+        success: false,
+        data: null,
+        error: "Missing worldId or task ID",
+        status: 400
+      };
+    }
+
+    if (!accessToken) {
+      console.log("Cannot reward points: no access token available");
+      return {
+        success: false,
+        data: null,
+        error: "No access token available. Please sign in.",
+        status: 401
+      };
+    }
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Validator': 'worldapp',
+        'Frontend': 'worldapp',
+        'Authorization': `Bearer ${accessToken}`
+      };
+
+      
+      const payload = {
+        task_id: taskId,
+        userEmail: worldId, // worldId is used as userEmail in the backend
+        points: points,
+        url: typeof window !== 'undefined' ? encodeURIComponent(window.location.href) : '',
+        type: type // Either "feedback" or "share"
+      };
+      
+      console.log('Reward payload:', payload);
+      
+      const response = await fetch(`${baseUrl}/reward_point`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log(`Successfully rewarded ${points} points for ${type}`, data);
+        return {
+          success: true,
+          data: data,
+          error: null,
+          status: response.status
+        };
+      } else {
+        console.error("Failed to reward points:", data.message || "Unknown error");
+        return {
+          success: false,
+          data: null,
+          error: data.message || "Unknown error",
+          status: response.status
+        };
+      }
+    } catch (error) {
+      console.error("Error rewarding points:", error);
+      return {
+        success: false,
+        data: null,
+        error: "Error processing reward",
+        status: 0
+      };
+    }
+  };
+
+  return { rewardBonusPoint };
+}
+
+/**
  * Hook-friendly wrappers that use the in-hook postToBackend (which automatically
  * reads the auth token via useAuth). Prefer these inside React components.
  */
